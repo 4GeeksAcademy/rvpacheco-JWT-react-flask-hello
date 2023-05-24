@@ -16,3 +16,47 @@ def handle_hello():
     }
 
     return jsonify(response_body), 200
+
+@app.route("/signup", methods=["POST"])
+def signup():
+    data = request.get_json()
+    print(data)
+    new_user = User.query.filter_by(email=data["email"]).first()
+    if (new_user is not None):
+        return jsonify({
+            "msg":"Email registrado"
+        }),400
+    secure_password = bcrypt.generate_password_hash(
+        data["password"],rounds = None).decode("utf-8")
+    new_user = User(email = data["email"],
+                    password = secure_password, is_active=True)
+    db.session.add(new_user)
+    db.session.commit()
+    return jsonify(new_user.serialize()), 201
+
+@app.route("/login", methods=["POST"])
+def user_login():
+    user_email = request.json.get("email")
+    user_password = request.json.get("password")
+    # buscar el usuario por el correo
+    user = User.query.filter_by(email=user_email).first()
+    if user is None:
+        return jsonify({"message": "User no found"}), 401
+    
+    #verificar la clave
+    if not bcrypt.check_password_hash(user.password, user_password):
+        return jsonify({"message": "Wrong password"}),401
+    #generar el token
+    acces_token = create_access_token(identify=user.id)
+    #retornar el token
+    return jsonify({"accessToken": acces_token})
+
+@app.route("/helloprotected",methods=['GET'])
+@jwt_required()
+def hello_protected_get():
+    user_id= get_jwt_identity()
+    return jsonify({
+        "userId": user_id,
+        "message": "Hello protected routed"
+    })
+    
